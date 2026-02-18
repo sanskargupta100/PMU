@@ -1,0 +1,150 @@
+% IEEE-14 bus PMU placement (Case I: no ZIBs, no flow measurements)
+% 
+Connectivity matrix (from paper)
+A = [1 1 0 0 1 0 0 0 0 0 0 0 0 0;
+     1 1 1 1 1 0 0 0 0 0 0 0 0 0;
+     0 1 1 1 0 0 0 0 0 0 0 0 0 0;
+     0 1 1 1 1 0 1 0 1 0 0 0 0 0;
+     1 1 0 1 1 1 0 0 0 0 0 0 0 0;
+     0 0 0 0 1 1 0 0 0 0 1 1 1 0;
+     0 0 0 1 0 0 1 1 1 0 0 0 0 0;
+     0 0 0 0 0 0 1 1 0 0 0 0 0 0;
+     0 0 0 1 0 0 1 0 1 1 0 0 0 1;
+     0 0 0 0 0 0 0 0 1 1 1 0 0 0;
+     0 0 0 0 0 1 0 0 0 1 1 0 0 0;
+     0 0 0 0 0 1 0 0 0 0 0 1 1 0;
+     0 0 0 0 0 1 0 0 0 0 0 1 1 1;
+     0 0 0 0 0 0 0 0 1 0 0 0 1 1];
+
+n = size(A,1);
+
+% Objective function: minimize number of PMUs
+f = ones(1,n);
+
+% Constraints: A*x >= 1
+Aineq = -A;
+bineq = -ones(n,1);
+
+% Integer constraints
+intcon = 1:n;
+lb = zeros(n,1);
+ub = ones(n,1);
+
+% Solve ILP
+x = intlinprog(f,intcon,Aineq,bineq,[],[],lb,ub);
+
+x = round(x);  % Round to 0/1
+
+% Display result
+disp('PMU placement (1 = PMU, 0 = no PMU):');
+disp(x');
+disp(['Minimum number of PMUs = ', num2str(sum(x))]);
+
+
+% IEEE-14 PMU placement - Case II (with ZIB merging)
+%% IEEE-14 Bus PMU Placement  (Case II: with ZIB merging)
+
+% x = solution from intlinprog after merging (1 x n, here n = 13)
+% Norig = 14; z = 7;  % if these variables exist already, skip redefining
+Norig = 14;
+z = 7;
+
+% mapping from reduced index -> original bus numbers
+orig_indices = 1:Norig;
+orig_indices(z) = [];          % remove the merged bus 7
+% orig_indices is now length 13: [1 2 3 4 5 6 8 9 10 11 12 13 14]
+
+% display reduced solution (what solver printed)
+fprintf('Reduced solution (indices 1..%d):\n', numel(x));
+disp(x);
+
+% Map reduced solution back to full original 14-vector
+full_x = zeros(1,Norig);       % full vector, indices 1..14
+full_x(orig_indices) = x;      % place reduced entries into their original slots
+% Note: full_x(z) remains 0 (removed ZIB)
+
+% Display full vector aligned with original bus numbers
+fprintf('Full vector aligned with original buses 1..%d:\n', Norig);
+disp(full_x);
+
+% Print the PMU bus numbers in original numbering
+pmu_original = find(full_x == 1);
+fprintf('PMUs in original bus numbering:\n');
+disp(pmu_original');
+
+
+%% IEEE-14 Bus PMU Placement - Case III (with Power Flow + ZIB merging)
+
+Norig = size(A,1);          % 14 buses initially
+bus_map = 1:Norig;          % Track mapping of reduced → original bus numbers
+
+----- Step B: Merge flow-measured branches -----
+flow_branches = [1 5; 6 11; 9 10];  % (i,j) pairs
+
+for k = 1:size(flow_branches,1)
+    i = flow_branches(k,1);
+    j = flow_branches(k,2);
+
+    Merge rows i and j
+    A(i,:) = A(i,:) | A(j,:);
+    A(:,i) = A(:,i) | A(:,j);
+
+    Remove bus j (row and column)
+    A(:,j) = [];
+    A(j,:) = [];
+
+    Update mapping
+    bus_map(j) = [];   % remove j from mapping
+
+    Adjust indices in flow_branches after removal
+    flow_branches(flow_branches > j) = flow_branches(flow_branches > j) - 1;
+end
+
+----- Step C: Merge ZIB (bus 7 with 8) -----
+Carefully track mapping after merges
+ZIB = find(bus_map == 7);    % index of original bus 7 in reduced system
+Radial = find(bus_map == 8); % index of original bus 8 in reduced system
+
+A = A > 0;
+A(Radial,:) = double(A(Radial,:) | A(ZIB,:));
+A(:,Radial) = double(A(:,Radial) | A(:,ZIB));
+A(:,ZIB) = [];
+A(ZIB,:) = [];
+
+bus_map(ZIB) = [];   % remove merged ZIB (original bus 7)
+n = size(A,1);
+
+----- Step D: ILP formulation -----
+f = ones(1,n);
+Aineq = -A;
+bineq = -ones(n,1);
+intcon = 1:n;
+lb = zeros(n,1);
+ub = ones(n,1);
+
+x = intlinprog(f,intcon,Aineq,bineq,[],[],lb,ub);
+x = round(x);
+
+----- Step E: Display results -----
+disp('PMU placement after flow + ZIB merging (Case III):');
+disp(x');
+disp(['Minimum PMUs (Case III) = ', num2str(sum(x))]);
+
+Map to original bus numbering
+pmu_new_idx = find(x==1);
+pmu_original = bus_map(pmu_new_idx);
+
+Display mapping and results
+disp('---------------------------------------------');
+disp('Bus mapping (reduced → original):');
+disp(bus_map);
+disp('---------------------------------------------');
+disp('PMU buses in original IEEE-14 numbering:');
+disp(pmu_original');
+
+Build full 14-bus vector for visual clarity
+full_x = zeros(1,Norig);
+full_x(pmu_original) = 1;
+
+disp('Full vector aligned with original buses 1..14:');
+disp(full_x);
