@@ -1,0 +1,366 @@
+%% IEEE-30 Bus System PMU Placement Optimization
+% Adapted from IEEE-14 bus system code
+% Reference: IEEE 30 Bus System Technical Note (Manitoba HVDC Research Centre)
+% Reference: Rahman & Zobaa (2016) - Optimal PMU placement using topology transformation
+
+%% IEEE-30 Bus System Information (VERIFIED)
+% Zero Injection Buses (ZIBs): 6, 9, 22, 25, 27, 28
+% Radial Buses: 11, 13, 26
+% Expected Results (from Rahman & Zobaa, 2016):
+%   Case I:  10 PMUs at {1, 7, 8, 10, 11, 12, 19, 23, 26, 30}
+%   Case II: 7 PMUs at {1, 7, 10, 12, 19, 24, 30}
+
+clear; clc;
+
+%% Case I: Basic PMU Placement (No ZIBs, No Flow Measurements)
+disp('========================================');
+disp('CASE I: Basic PMU Placement');
+disp('========================================');
+
+% Connectivity matrix for IEEE-30 bus system
+A = [...
+0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+1 0 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 0 1 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0;...
+0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0;...
+0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 0 0 1 1 1 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 1 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 1 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 1;...
+0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 0;...
+];
+
+n = size(A,1);
+
+% Objective function: minimize number of PMUs
+f = ones(1,n);
+
+% Constraints: A*x >= 1 (each bus must be observable)
+Aineq = -A;
+bineq = -ones(n,1);
+
+% Integer constraints (binary decision variables)
+intcon = 1:n;
+lb = zeros(n,1);
+ub = ones(n,1);
+
+% Solve ILP
+options = optimoptions('intlinprog','Display','off');
+x1 = intlinprog(f,intcon,Aineq,bineq,[],[],lb,ub,options);
+x1 = round(x1);  % Round to 0/1
+
+% Display results
+disp('PMU placement (1 = PMU installed, 0 = no PMU):');
+disp(x1');
+disp(['Minimum number of PMUs required = ', num2str(sum(x1))]);
+pmu_buses_case1 = find(x1 == 1);
+disp('PMU installed at buses:');
+disp(pmu_buses_case1');
+disp('Expected: 10 PMUs at {1, 7, 8, 10, 11, 12, 19, 23, 26, 30}');
+
+%% Case II: PMU Placement with ZIB Merging
+disp(' ');
+disp('========================================');
+disp('CASE II: PMU Placement with ZIB Merging');
+disp('========================================');
+
+% Reset connectivity matrix
+A2 = [...
+0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+1 0 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 0 1 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0;...
+0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0;...
+0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 0 0 1 1 1 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 1 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 1 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 1;...
+0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 0;...
+];
+
+Norig = 30;
+bus_map = 1:Norig;
+
+% CORRECT Zero Injection Buses (ZIBs) - buses with NO generation AND NO load
+ZIBs = [6, 9, 22, 25, 27, 28];
+disp('Zero Injection Buses (ZIBs): {6, 9, 22, 25, 27, 28}');
+
+% Radial buses - buses with only one connection
+radial_buses = [11, 13, 26];
+disp('Radial Buses: {11, 13, 26}');
+disp(' ');
+
+% Apply topology transformation method with three rules
+disp('Applying ZIB merging with topology transformation rules:');
+ZIBs_to_process = ZIBs;
+
+for k = 1:length(ZIBs_to_process)
+    zib_bus = ZIBs_to_process(k);
+    
+    % Find current index in reduced system
+    zib_idx = find(bus_map == zib_bus);
+    
+    if isempty(zib_idx)
+        continue;  % Already merged
+    end
+    
+    % Find adjacent buses
+    adjacent_buses_idx = find(A2(zib_idx,:) == 1);
+    
+    if isempty(adjacent_buses_idx)
+        continue;
+    end
+    
+    % Rule A: Check if any adjacent bus is a radial bus
+    merge_with_idx = [];
+    merge_with_bus = [];
+    
+    for adj_idx = adjacent_buses_idx
+        adj_bus = bus_map(adj_idx);
+        if ismember(adj_bus, radial_buses)
+            merge_with_idx = adj_idx;
+            merge_with_bus = adj_bus;
+            fprintf('  ZIB %d merged with radial bus %d (Rule A)\n', zib_bus, adj_bus);
+            break;
+        end
+    end
+    
+    % Rule C: If no radial bus, merge with bus having most connections
+    if isempty(merge_with_idx)
+        max_connections = 0;
+        for adj_idx = adjacent_buses_idx
+            num_connections = sum(A2(adj_idx,:));
+            if num_connections > max_connections
+                max_connections = num_connections;
+                merge_with_idx = adj_idx;
+                merge_with_bus = bus_map(adj_idx);
+            end
+        end
+        fprintf('  ZIB %d merged with bus %d (Rule C - %d connections)\n', ...
+                zib_bus, merge_with_bus, max_connections);
+    end
+    
+    if ~isempty(merge_with_idx)
+        % Merge ZIB with selected adjacent bus
+        A2(merge_with_idx,:) = A2(merge_with_idx,:) | A2(zib_idx,:);
+        A2(:,merge_with_idx) = A2(:,merge_with_idx) | A2(:,zib_idx);
+        
+        % Remove ZIB row and column
+        A2(:,zib_idx) = [];
+        A2(zib_idx,:) = [];
+        
+        % Update bus mapping
+        bus_map(zib_idx) = [];
+    end
+end
+
+n2 = size(A2,1);
+fprintf('\nReduced system: %d buses (from 30)\n\n', n2);
+
+% Solve ILP with reduced system
+f2 = ones(1,n2);
+Aineq2 = -A2;
+bineq2 = -ones(n2,1);
+intcon2 = 1:n2;
+lb2 = zeros(n2,1);
+ub2 = ones(n2,1);
+
+x2 = intlinprog(f2,intcon2,Aineq2,bineq2,[],[],lb2,ub2,options);
+x2 = round(x2);
+
+% Map back to original bus numbering
+pmu_reduced_idx = find(x2 == 1);
+pmu_buses_case2 = bus_map(pmu_reduced_idx);
+
+disp(['Minimum number of PMUs (with ZIB merging) = ', num2str(sum(x2))]);
+disp('PMU installed at buses (original numbering):');
+disp(sort(pmu_buses_case2)');
+disp('Expected: 7 PMUs at {1, 7, 10, 12, 19, 24, 30}');
+
+%% Case III: PMU Placement with Flow Measurements and ZIB Merging
+disp(' ');
+disp('========================================');
+disp('CASE III: Flow Measurements + ZIB Merging');
+disp('========================================');
+
+% Reset connectivity matrix
+A3 = [...
+0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+1 0 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 0 1 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0;...
+0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0;...
+0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 0 0 1 1 1 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 1 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 1 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 1;...
+0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 0;...
+];
+
+bus_map3 = 1:Norig;
+
+% Define flow-measured branches (example - you can modify these)
+flow_branches = [1 2; 2 6; 6 28];
+disp('Flow-measured branches: [1-2], [2-6], [6-28]');
+disp(' ');
+
+% Step 1: Merge flow-measured branches
+disp('Step 1: Merging flow-measured branches:');
+for k = 1:size(flow_branches,1)
+    i = flow_branches(k,1);
+    j = flow_branches(k,2);
+    
+    % Find current indices in reduced system
+    i_idx = find(bus_map3 == i);
+    j_idx = find(bus_map3 == j);
+    
+    if isempty(i_idx) || isempty(j_idx)
+        continue;
+    end
+    
+    fprintf('  Merging buses %d and %d (flow measurement)\n', i, j);
+    
+    % Merge rows i and j
+    A3(i_idx,:) = A3(i_idx,:) | A3(j_idx,:);
+    A3(:,i_idx) = A3(:,i_idx) | A3(:,j_idx);
+    
+    % Remove bus j (row and column)
+    A3(:,j_idx) = [];
+    A3(j_idx,:) = [];
+    
+    % Update mapping
+    bus_map3(j_idx) = [];
+    
+    % Adjust indices in flow_branches after removal
+    flow_branches(flow_branches > j) = flow_branches(flow_branches > j) - 1;
+end
+
+% Step 2: Merge ZIBs (CORRECT ZIBs: 6, 9, 22, 25, 27, 28)
+disp(' ');
+disp('Step 2: Merging ZIBs:');
+ZIBs3 = [6, 9, 22, 25, 27, 28];
+for k = 1:length(ZIBs3)
+    zib_bus = ZIBs3(k);
+    zib_idx = find(bus_map3 == zib_bus);
+    
+    if isempty(zib_idx)
+        continue;
+    end
+    
+    connected = find(A3(zib_idx,:) == 1);
+    if ~isempty(connected)
+        merge_with = connected(1);
+        merge_with_bus = bus_map3(merge_with);
+        
+        fprintf('  Merging ZIB %d with bus %d\n', zib_bus, merge_with_bus);
+        
+        A3(merge_with,:) = A3(merge_with,:) | A3(zib_idx,:);
+        A3(:,merge_with) = A3(:,merge_with) | A3(:,zib_idx);
+        
+        A3(:,zib_idx) = [];
+        A3(zib_idx,:) = [];
+        
+        bus_map3(zib_idx) = [];
+    end
+end
+
+n3 = size(A3,1);
+fprintf('\nReduced system: %d buses (from 30)\n\n', n3);
+
+% Step 3: Solve ILP
+f3 = ones(1,n3);
+Aineq3 = -A3;
+bineq3 = -ones(n3,1);
+intcon3 = 1:n3;
+lb3 = zeros(n3,1);
+ub3 = ones(n3,1);
+
+x3 = intlinprog(f3,intcon3,Aineq3,bineq3,[],[],lb3,ub3,options);
+x3 = round(x3);
+
+% Step 4: Display results
+disp(['Minimum PMUs (Flow + ZIB merging) = ', num2str(sum(x3))]);
+
+pmu_new_idx = find(x3==1);
+pmu_original = bus_map3(pmu_new_idx);
+
+disp('PMU buses in original IEEE-30 numbering:');
+disp(sort(pmu_original)');
+
+% Build full 30-bus vector for visualization
+full_x3 = zeros(1,Norig);
+full_x3(pmu_original) = 1;
+
+disp('Full vector aligned with original buses 1..30:');
+disp(full_x3);
+
+%% Summary Comparison
+disp(' ');
+disp('========================================');
+disp('SUMMARY COMPARISON');
+disp('========================================');
+fprintf('Case I (Basic):              %d PMUs\n', sum(x1));
+fprintf('Case II (ZIB merging):       %d PMUs\n', sum(x2));
+fprintf('Case III (Flow + ZIB):       %d PMUs\n', sum(x3));
+disp(' ');
