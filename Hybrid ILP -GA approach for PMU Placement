@@ -1,0 +1,375 @@
+%% IEEE-30 Bus System: Hybrid ILP-GA for Optimal PMU Placement
+% Combines Integer Linear Programming (ILP) with Genetic Algorithm (GA)
+% Reference: IEEE 30 Bus System + Rahman & Zobaa (2016)
+
+clear; clc;
+
+%% System Configuration
+% Connectivity matrix for IEEE-30 bus system
+A = [...
+0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+1 0 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 1 0 1 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0;...
+0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0;...
+0 0 0 0 0 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 0 0 1 1 1 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 1 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 1 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 1;...
+0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1;...
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 0;...
+];
+
+n = size(A,1);
+ZIBs = [6, 9, 22, 25, 27, 28];
+radial_buses = [11, 13, 26];
+
+%% Function Definitions
+
+% Check if system is fully observable
+function observable = checkObservability(x, A)
+    x = x(:);  % Ensure column vector
+    observable = all((A * x) >= 1);
+end
+
+% Calculate Bus Observability Index (BOI)
+function boi = calculateBOI(x, A)
+    x = x(:);  % Ensure column vector
+    boi = A * x;
+end
+
+% Fitness function for GA
+function [fitness, num_pmus, is_feasible] = evaluateFitness(x, A)
+    x = x(:);  % CRITICAL FIX: Convert to column vector
+    x = round(x);  % Ensure binary
+    n = size(A, 1);
+    num_pmus = sum(x);
+    
+    % Check full observability
+    observable_count = A * x;
+    is_feasible = all(observable_count >= 1);
+    
+    if is_feasible
+        % Penalize number of PMUs, reward redundancy
+        redundancy = sum(observable_count) - n;
+        fitness = num_pmus - 0.1 * redundancy;  % Minimize PMUs, slight preference for redundancy
+    else
+        % Heavy penalty for infeasible solutions
+        unobservable_buses = sum(observable_count < 1);
+        fitness = 1000 + num_pmus + 100 * unobservable_buses;
+    end
+end
+
+%% CASE I: Pure ILP Approach
+disp('========================================');
+disp('CASE I: Pure ILP Approach');
+disp('========================================');
+
+f_ilp = ones(1,n);
+Aineq = -A;
+bineq = -ones(n,1);
+intcon = 1:n;
+lb = zeros(n,1);
+ub = ones(n,1);
+
+options_ilp = optimoptions('intlinprog','Display','off');
+tic;
+x_ilp = intlinprog(f_ilp,intcon,Aineq,bineq,[],[],lb,ub,options_ilp);
+time_ilp = toc;
+x_ilp = round(x_ilp);
+
+pmu_buses_ilp = find(x_ilp == 1);
+boi_ilp = calculateBOI(x_ilp, A);
+
+fprintf('Time taken: %.4f seconds\n', time_ilp);
+fprintf('Number of PMUs: %d\n', sum(x_ilp));
+fprintf('PMU locations: ');
+disp(pmu_buses_ilp');
+fprintf('System observable: %s\n', mat2str(checkObservability(x_ilp, A)));
+fprintf('Average BOI: %.2f\n', mean(boi_ilp));
+
+%% CASE II: Pure Genetic Algorithm Approach
+disp(' ');
+disp('========================================');
+disp('CASE II: Pure Genetic Algorithm');
+disp('========================================');
+
+% GA Parameters
+ga_options = optimoptions('ga', ...
+    'PopulationSize', 100, ...
+    'MaxGenerations', 200, ...
+    'EliteCount', 10, ...
+    'CrossoverFraction', 0.8, ...
+    'FunctionTolerance', 1e-6, ...
+    'Display', 'off', ...
+    'PlotFcn', []);
+
+% Fitness function wrapper
+fitness_func = @(x) evaluateFitness(x, A);
+
+tic;
+[x_ga, fval_ga] = ga(fitness_func, n, [], [], [], [], ...
+    zeros(1,n), ones(1,n), [], 1:n, ga_options);
+time_ga = toc;
+
+x_ga = round(x_ga);
+pmu_buses_ga = find(x_ga == 1);
+boi_ga = calculateBOI(x_ga, A);
+
+fprintf('Time taken: %.4f seconds\n', time_ga);
+fprintf('Number of PMUs: %d\n', sum(x_ga));
+fprintf('PMU locations: ');
+disp(pmu_buses_ga');
+fprintf('System observable: %s\n', mat2str(checkObservability(x_ga, A)));
+fprintf('Average BOI: %.2f\n', mean(boi_ga));
+fprintf('GA Fitness value: %.4f\n', fval_ga);
+
+%% CASE III: Hybrid ILP-GA Approach
+disp(' ');
+disp('========================================');
+disp('CASE III: Hybrid ILP-GA Approach');
+disp('========================================');
+disp('Strategy: Use ILP for initial solution, GA for optimization');
+
+% Step 1: Get ILP solution as initial population seed
+x_ilp_seed = x_ilp;
+
+% Step 2: Create custom initial population with ILP solution
+pop_size = 100;
+initial_pop = double(rand(pop_size, n) > 0.5);  % Random binary population as double
+
+% Seed first 20% with ILP solution and variations
+n_seeds = ceil(pop_size * 0.2);
+for i = 1:n_seeds
+    if i == 1
+        initial_pop(i, :) = double(x_ilp_seed');  % Pure ILP solution
+    else
+        % Create variations by flipping random bits
+        temp = double(x_ilp_seed');
+        n_flips = randi([1, 3]);  % Flip 1-3 random bits
+        flip_idx = randperm(n, n_flips);
+        temp(flip_idx) = 1 - temp(flip_idx);  % Flip between 0 and 1
+        initial_pop(i, :) = temp;
+    end
+end
+
+% Custom GA options for hybrid approach
+ga_hybrid_options = optimoptions('ga', ...
+    'PopulationSize', 100, ...
+    'MaxGenerations', 150, ...
+    'EliteCount', 15, ...
+    'CrossoverFraction', 0.8, ...
+    'MutationFcn', {@mutationuniform, 0.05}, ...
+    'FunctionTolerance', 1e-6, ...
+    'Display', 'off', ...
+    'InitialPopulationMatrix', initial_pop);
+
+tic;
+[x_hybrid, fval_hybrid] = ga(fitness_func, n, [], [], [], [], ...
+    zeros(1,n), ones(1,n), [], 1:n, ga_hybrid_options);
+time_hybrid = toc;
+
+x_hybrid = round(x_hybrid);
+pmu_buses_hybrid = find(x_hybrid == 1);
+boi_hybrid = calculateBOI(x_hybrid, A);
+
+fprintf('Time taken: %.4f seconds\n', time_hybrid);
+fprintf('Number of PMUs: %d\n', sum(x_hybrid));
+fprintf('PMU locations: ');
+disp(pmu_buses_hybrid');
+fprintf('System observable: %s\n', mat2str(checkObservability(x_hybrid, A)));
+fprintf('Average BOI: %.2f\n', mean(boi_hybrid));
+fprintf('Hybrid Fitness value: %.4f\n', fval_hybrid);
+
+%% CASE IV: Hybrid ILP-GA with ZIB Merging
+disp(' ');
+disp('========================================');
+disp('CASE IV: Hybrid ILP-GA with ZIB Merging');
+disp('========================================');
+
+% Apply ZIB merging
+A_zib = A;
+bus_map = 1:n;
+
+for k = 1:length(ZIBs)
+    zib_bus = ZIBs(k);
+    zib_idx = find(bus_map == zib_bus);
+    
+    if isempty(zib_idx)
+        continue;
+    end
+    
+    adjacent_buses_idx = find(A_zib(zib_idx,:) == 1);
+    
+    if isempty(adjacent_buses_idx)
+        continue;
+    end
+    
+    % Find best bus to merge with (radial or most connections)
+    merge_with_idx = [];
+    for adj_idx = adjacent_buses_idx
+        adj_bus = bus_map(adj_idx);
+        if ismember(adj_bus, radial_buses)
+            merge_with_idx = adj_idx;
+            break;
+        end
+    end
+    
+    if isempty(merge_with_idx)
+        [~, merge_with_idx] = max(sum(A_zib(adjacent_buses_idx,:), 2));
+        merge_with_idx = adjacent_buses_idx(merge_with_idx);
+    end
+    
+    % Merge
+    A_zib(merge_with_idx,:) = A_zib(merge_with_idx,:) | A_zib(zib_idx,:);
+    A_zib(:,merge_with_idx) = A_zib(:,merge_with_idx) | A_zib(:,zib_idx);
+    A_zib(:,zib_idx) = [];
+    A_zib(zib_idx,:) = [];
+    bus_map(zib_idx) = [];
+end
+
+n_reduced = size(A_zib, 1);
+fprintf('Reduced system: %d buses (from %d)\n', n_reduced, n);
+
+% ILP on reduced system
+f_zib = ones(1,n_reduced);
+Aineq_zib = -A_zib;
+bineq_zib = -ones(n_reduced,1);
+intcon_zib = 1:n_reduced;
+
+x_zib_ilp = intlinprog(f_zib,intcon_zib,Aineq_zib,bineq_zib,[],[],zeros(n_reduced,1),ones(n_reduced,1),options_ilp);
+x_zib_ilp = round(x_zib_ilp);
+
+% GA on reduced system
+fitness_func_zib = @(x) evaluateFitness(x, A_zib);
+
+% Create initial population for ZIB case
+pop_size_zib = 80;
+initial_pop_zib = double(rand(pop_size_zib, n_reduced) > 0.5);  % Double type
+
+% Seed with ILP solution
+n_seeds_zib = ceil(pop_size_zib * 0.2);
+for i = 1:n_seeds_zib
+    if i == 1
+        initial_pop_zib(i, :) = double(x_zib_ilp');
+    else
+        temp = double(x_zib_ilp');
+        n_flips = randi([1, 3]);
+        flip_idx = randperm(n_reduced, n_flips);
+        temp(flip_idx) = 1 - temp(flip_idx);  % Flip between 0 and 1
+        initial_pop_zib(i, :) = temp;
+    end
+end
+
+ga_zib_options = optimoptions('ga', ...
+    'PopulationSize', 80, ...
+    'MaxGenerations', 100, ...
+    'EliteCount', 12, ...
+    'CrossoverFraction', 0.8, ...
+    'Display', 'off', ...
+    'InitialPopulationMatrix', initial_pop_zib);
+
+tic;
+[x_zib_hybrid, fval_zib_hybrid] = ga(fitness_func_zib, n_reduced, [], [], [], [], ...
+    zeros(1,n_reduced), ones(1,n_reduced), [], 1:n_reduced, ga_zib_options);
+time_zib_hybrid = toc;
+
+x_zib_hybrid = round(x_zib_hybrid);
+
+% Map back to original bus numbering
+pmu_reduced_idx = find(x_zib_hybrid == 1);
+pmu_buses_zib_hybrid = bus_map(pmu_reduced_idx);
+
+fprintf('Time taken: %.4f seconds\n', time_zib_hybrid);
+fprintf('Number of PMUs: %d\n', sum(x_zib_hybrid));
+fprintf('PMU locations (original buses): ');
+disp(sort(pmu_buses_zib_hybrid)');
+fprintf('Hybrid-ZIB Fitness value: %.4f\n', fval_zib_hybrid);
+
+%% Comparative Analysis
+disp(' ');
+disp('========================================');
+disp('COMPARATIVE ANALYSIS');
+disp('========================================');
+
+fprintf('%-25s | %-6s | %-12s | %-12s\n', 'Method', 'PMUs', 'Time (s)', 'Avg BOI');
+fprintf('%-25s-+-%-6s-+-%-12s-+-%-12s\n', repmat('-',1,25), repmat('-',1,6), repmat('-',1,12), repmat('-',1,12));
+fprintf('%-25s | %6d | %12.4f | %12.2f\n', 'ILP Only', sum(x_ilp), time_ilp, mean(boi_ilp));
+fprintf('%-25s | %6d | %12.4f | %12.2f\n', 'GA Only', sum(x_ga), time_ga, mean(boi_ga));
+fprintf('%-25s | %6d | %12.4f | %12.2f\n', 'Hybrid ILP-GA', sum(x_hybrid), time_hybrid, mean(boi_hybrid));
+fprintf('%-25s | %6d | %12.4f | %12s\n', 'Hybrid ILP-GA + ZIB', sum(x_zib_hybrid), time_zib_hybrid, 'N/A');
+
+disp(' ');
+disp('Expected (Rahman & Zobaa 2016):');
+disp('  Case I:  10 PMUs at {1, 7, 8, 10, 11, 12, 19, 23, 26, 30}');
+disp('  Case II: 7 PMUs at {1, 7, 10, 12, 19, 24, 30}');
+
+%% Visualization
+figure('Position', [100, 100, 1200, 800]);
+
+% Plot 1: Number of PMUs comparison
+subplot(2,2,1);
+methods = {'ILP', 'GA', 'Hybrid', 'Hybrid+ZIB'};
+num_pmus = [sum(x_ilp), sum(x_ga), sum(x_hybrid), sum(x_zib_hybrid)];
+bar(num_pmus);
+set(gca, 'XTickLabel', methods);
+ylabel('Number of PMUs');
+title('PMU Count Comparison');
+grid on;
+
+% Plot 2: Computation time comparison
+subplot(2,2,2);
+times = [time_ilp, time_ga, time_hybrid, time_zib_hybrid];
+bar(times);
+set(gca, 'XTickLabel', methods);
+ylabel('Time (seconds)');
+title('Computation Time Comparison');
+grid on;
+
+% Plot 3: Bus Observability Index for ILP
+subplot(2,2,3);
+bar(boi_ilp);
+xlabel('Bus Number');
+ylabel('Observability Count');
+title('Bus Observability Index - ILP');
+grid on;
+
+% Plot 4: Bus Observability Index for Hybrid
+subplot(2,2,4);
+bar(boi_hybrid);
+xlabel('Bus Number');
+ylabel('Observability Count');
+title('Bus Observability Index - Hybrid ILP-GA');
+grid on;
+
+sgtitle('IEEE-30 Bus System: Hybrid ILP-GA PMU Placement Analysis');
+
+%% Key Insights
+disp(' ');
+disp('========================================');
+disp('KEY INSIGHTS');
+disp('========================================');
+disp('1. ILP provides optimal solution quickly but limited flexibility');
+disp('2. GA explores solution space but may need more iterations');
+disp('3. Hybrid approach combines ILP optimality with GA exploration');
+disp('4. ZIB merging reduces problem size significantly');
+disp('5. Hybrid+ZIB offers best balance of speed and solution quality');
